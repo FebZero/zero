@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- 复杂查询语句写在这里，其他简单语句可以用注解 -->
+<mapper namespace="com.sc.mapper.BookingMapper">
+	<!-- 嵌套式结果集 -->
+	<resultMap type="BookTicketInfo" id="bookingResult">
+		<id property="id" column="id" />
+		<result property="btno" column="btno" />
+		<result property="price" column="price" />
+		<result property="bookDate" column="bookdate" />
+		<result property="payState" column="paystate" />
+		<association property="customer" javaType="Customer">
+			<id property="id" column="cid" />
+			<result property="name" column="cname" />
+			<result property="cardno" column="ccardno" />
+			<result property="vip" column="cvip" />
+			<result property="phone" column="cphone" />
+			<result property="email" column="cemail" />
+			<result property="address" column="caddress" />
+			<result property="vip" column="cvip" />
+		</association>
+		<association property="flightCarbin"
+			javaType="FlightCarbinInfo">
+			<id property="id" column="fcid" />
+			<result property="seats" column="fcseats" />
+			<result property="price" column="fcprice" />
+			<association property="flight" javaType="Flight">
+				<id property="id" column="fid" />
+				<result property="fno" column="fno" />
+				<result property="fromDate" column="ffromdate" />
+				<result property="toDate" column="ftodate" />
+				<association property="route" javaType="Route">
+					<id property="id" column="rid" />
+					<result property="fromCity" column="rfromcity" />
+					<result property="toCity" column="rtoCity" />
+				</association>
+				<association property="plane" javaType="Plane">
+					<id property="id" column="pid" />
+					<result property="type" column="ptype" />
+					<result property="planeno" column="pplaneno" />
+					<result property="type" column="ptype" />
+					<result property="buyDate" column="pbuydate" />
+					<result property="serviceDate" column="pservicedate" />
+				</association>
+			</association>
+			<association property="carbinLevel"
+				javaType="CarbinLevel">
+				<id property="id" column="clid" />
+				<result property="name" column="clname" />
+			</association>
+		</association>
+	</resultMap>
+
+	<!-- 多表连接查询 -->
+	<select id="queryListByCondition" resultMap="bookingResult">
+		select bt.id as id,
+		bt.btno as btno,
+		bt.BOOKDATE as bookdate,
+		bt.PRICE as price,
+		bt.PAYSTATE as paystate,
+		f.id as fid,
+		f.fno as fno,
+		f.fromdate as ffromdate,
+		f.todate as ftodate,
+		r.id as rid,
+		r.fromcity as rfromcity,
+		r.tocity as rtocity,
+		p.id as pid,
+		p.planeno as pplaneno,
+		p.type as ptype,
+		p.buydate as pbuydate,
+		p.servicedate as pservicedate,
+		fc.id as fcid,
+		fc.seats as fcseats,
+		fc.price as fcprice,
+		cl.id as clid,
+		cl.name as clname,
+		c.id as cid,
+		c.name as cname,
+		c.cardno as ccardno,
+		c.phone as cphone,
+		c.email as cemail,
+		c.address as caddress,
+		c.vip as cvip
+		from bookticketinfo bt join customerinfo c on bt.cid=c.id
+		join flightcarbininfo fc on bt.fcid = fc.id
+		join carbinlevelinfo cl on fc.clid=cl.id
+		join flightinfo f on f.id = fc.fid
+		join routeinfo r on r.id = f.routeid
+		join planeinfo p on p.id = f.planeid
+		<where>
+			<if test="btno != null">
+				bt.btno = #{btno}
+			</if>
+			<if test="bookDate != null">
+				AND trunc(bt.bookdate,'DD') = trunc(#{bookDate},'DD')
+			</if>
+			<if test="fno != null">
+				AND f.fno = #{fno}
+			</if>
+			<if test="cardno != null">
+				AND c.cardno = #{cardno}
+			</if>
+		</where>
+	</select>
+
+
+	<!-- 批量删除 -->
+	<delete id="deleteMany" parameterType="java.util.List">
+		delete bookticketinfo
+		where id in
+		<foreach item="id" collection="list" open="(" close=")"
+			separator=",">
+			#{id}
+		</foreach>
+	</delete>
+</mapper>

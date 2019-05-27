@@ -1,0 +1,230 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- 复杂查询语句写在这里，其他简单语句可以用注解 -->
+<mapper namespace="com.sc.mapper.FlightMapper">
+<!-- 嵌套式结果集 -->
+	<resultMap type="Flight" id="flightResult">
+		<id property="id" column="id" />
+		<result property="fno" column="fno" />
+		<result property="fromDate" column="fromdate" />
+		<result property="toDate" column="todate" />
+		<result property="type" column="ftype" />
+		<association property="plane" 
+			javaType="Plane">
+			<id property="id" column="pid" />
+			<result property="planeno" column="pno" />
+			<result property="type" column="ptype" />
+			<result property="buyDate" column="pbuydate" />
+			<result property="serviceDate" column="pservicedate" />
+		</association>
+		<association property="route" 
+			javaType="Route">
+			<id property="id" column="rid" />
+			<result property="fromCity" column="fromCity" />
+		    <result property="toCity" column="toCity" />
+		</association>
+	    <collection property="fcList" ofType="FlightCarbinInfo"
+			javaType="ArrayList">
+			<id property="id" column="fcid" />
+			<result property="seats" column="seats" />
+			<result property="price" column="price" />
+			<association property="carbinLevel" javaType="CarbinLevel">
+			   <id property="id" column="clid" />
+			   <result property="name" column="clname" />
+			   <result property="service" column="clservice" />
+			</association>
+		</collection>
+	</resultMap>
+	<!-- N+1式 -->
+	<resultMap type="Flight" id="flightResultN1">
+		<id property="id" column="id" />
+		<result property="fno" column="fno" />
+		<result property="fromDate" column="fromdate" />
+		<result property="toDate" column="todate" />
+		<result property="type" column="ftype" />
+		<association property="plane" 
+			javaType="Plane">
+			<id property="id" column="pid" />
+			<result property="planeno" column="pno" />
+			<result property="type" column="ptype" />
+			<result property="buyDate" column="pbuydate" />
+			<result property="serviceDate" column="pservicedate" />
+		</association>
+		<association property="route" 
+			javaType="Route">
+			<id property="id" column="rid" />
+			<result property="fromCity" column="fromCity" />
+		    <result property="toCity" column="toCity" />
+		</association>
+	    <collection property="fcList" ofType="FlightCarbinInfo"
+			javaType="ArrayList" select="selectFCAndCarbinLevelByFid" 
+			column="id" fetchType="eager"><!-- 这里不能用lazy 否则生成json会报错 -->
+		</collection>
+	</resultMap>
+
+     <resultMap type="FlightCarbinInfo" id="FCResult">
+			<id property="id" column="fcid" />
+			<result property="seats" column="seats" />
+			<result property="price" column="price" />
+			<association property="carbinLevel" javaType="CarbinLevel">
+			   <id property="id" column="clid" />
+			   <result property="name" column="clname" />
+			   <result property="service" column="clservice" />
+			</association>
+     </resultMap>
+	<!-- 多表连接查询 -->
+	<select id="queryListByCondition" resultMap="flightResult">
+		select 
+		f.id as id,
+		f.fno as fno,
+		f.fromdate as fromdate,
+		f.todate as todate,
+		f.type as ftype,
+		cl.id as clid,
+		cl.name as clname,
+		cl.service as clservice,
+		fc.id as fcid,
+		fc.seats as seats,
+		fc.price as price,
+		r.id as rid,
+		r.fromcity as fromcity,
+		r.tocity as tocity,
+		p.id as pid,
+		p.planeno as pno,
+		p.type as ptype,
+		p.buydate as pbuydate,
+		p.servicedate as pservicedate
+		from flightinfo f join flightcarbininfo fc
+		on f.id = fc.fid join carbinlevelinfo cl 
+		on cl.id = fc.clid join routeinfo r 
+		on r.id = f.routeid join planeinfo p
+		on f.planeid = p.id
+	<where> 
+    <if test="fromCity != null">
+         r.fromcity = #{fromCity}
+    </if> 
+    <if test="toCity != null">
+        AND r.tocity = #{toCity}
+    </if>
+    <if test="fromDate != null">
+        AND TRUNC(f.fromdate,'DD') = TRUNC(#{fromDate},'DD') 
+    </if>
+  </where>
+	</select>
+	
+	<!--N+1式条件查询 由于航班与舱位是多对多的关系 因此需要拆分成N+1,否则分页数据不正确-->
+	<select id="queryListByConditionN1" resultMap="flightResultN1">
+		select 
+		f.id as id,
+		f.fno as fno,
+		f.fromdate as fromdate,
+		f.todate as todate,
+		f.type as ftype,
+		r.id as rid,
+		r.fromcity as fromcity,
+		r.tocity as tocity,
+		p.id as pid,
+		p.planeno as pno,
+		p.type as ptype,
+		p.buydate as pbuydate,
+		p.servicedate as pservicedate
+		from flightinfo f  join routeinfo r 
+		on r.id = f.routeid join planeinfo p
+		on f.planeid = p.id
+	<where> 
+    <if test="fromCity != null">
+         r.fromcity = #{fromCity}
+    </if> 
+    <if test="toCity != null">
+        AND r.tocity = #{toCity}
+    </if>
+    <if test="fromDate != null">
+        AND TRUNC(f.fromdate,'DD') = TRUNC(#{fromDate},'DD') 
+    </if>
+  </where>
+	</select>
+	
+	<!--N+1式条件查询 由于航班与舱位是多对多的关系 因此需要拆分成N+1,否则分页数据不正确-->
+	<select id="selectFCAndCarbinLevelByFid" resultMap="FCResult">
+		select 
+		cl.id as clid,
+		cl.name as clname,
+		cl.service as clservice,
+		fc.id as fcid,
+		fc.seats as seats,
+		fc.price as price
+		from flightcarbininfo fc
+	    join carbinlevelinfo cl 
+		on cl.id = fc.clid
+	    where fc.fid = #{fid}
+	</select>
+	
+<select id="selectById" resultMap="flightResult">
+		select 
+		f.id as id,
+		f.fno as fno,
+		f.fromdate as fromdate,
+		f.todate as todate,
+		f.type as ftype,
+		cl.id as clid,
+		cl.name as clname,
+		cl.service as clservice,
+		fc.id as fcid,
+		fc.seats as seats,
+		fc.price as price,
+		r.id as rid,
+		r.fromcity as fromcity,
+		r.tocity as tocity,
+		p.id as pid,
+		p.planeno as pno,
+		p.type as ptype,
+		p.buydate as pbuydate,
+		p.servicedate as pservicedate 
+		from flightinfo f left join flightcarbininfo fc 
+		on f.id = fc.fid left join carbinlevelinfo cl 
+		on cl.id = fc.clid left join routeinfo r  
+		on r.id = f.routeid left join planeinfo p 
+		on f.planeid = p.id 
+		where f.id=#{id}
+</select>
+
+<select id="selectByIdAndClid" resultMap="flightResult">
+		select 
+		f.id as id,
+		f.fno as fno,
+		f.fromdate as fromdate,
+		f.todate as todate,
+		f.type as ftype,
+		cl.id as clid,
+		cl.name as clname,
+		cl.service as clservice,
+		fc.id as fcid,
+		fc.seats as seats,
+		fc.price as price,
+		r.id as rid,
+		r.fromcity as fromcity,
+		r.tocity as tocity,
+		p.id as pid,
+		p.planeno as pno,
+		p.type as ptype,
+		p.buydate as pbuydate,
+		p.servicedate as pservicedate 
+		from flightinfo f join flightcarbininfo fc 
+		on f.id = fc.fid join carbinlevelinfo cl 
+		on cl.id = fc.clid join routeinfo r  
+		on r.id = f.routeid join planeinfo p 
+		on f.planeid = p.id 
+		where f.id=#{id} and clid=#{clid}
+</select>
+		
+		<!-- 批量删除 -->
+    <delete id="deleteMany" parameterType="java.util.List">
+        delete flightinfo
+        where id in
+        <foreach item="id" collection="list" open="(" close=")" separator=",">
+            #{id}
+        </foreach>
+    </delete>
+</mapper>
